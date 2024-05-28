@@ -2,6 +2,8 @@ import  torch
 from PIL import Image
 import torchvision.transforms as T
 import matplotlib.pyplot as plt
+import os
+import cv2
 
 
 CLASSES = [
@@ -51,7 +53,6 @@ def plot_results(pil_img, prob, boxes):
     plt.axis('off')
     plt.show()
     
-
 def detect(model, im, transform = None, threshold_confidence = 0.7):
     if transform is None:
         # standard PyTorch mean-std input image normalization
@@ -84,9 +85,14 @@ def detect(model, im, transform = None, threshold_confidence = 0.7):
 
     return probas[keep][person_keep], bboxes_scaled[person_keep]
 
-
-image_path ="im.jpg"
 model = torch.hub.load('facebookresearch/detr:main', 'detr_resnet50', pretrained=True)
-img = Image.open(image_path)
-prob, bboxes_scaled = detect(model, img)
-plot_results(img, prob, bboxes_scaled)
+data_path = '../MOT17/train'
+for dir in os.listdir(data_path):
+    for video_dir in os.listdir(os.path.join(data_path, dir)):
+        if video_dir == 'img1':
+            for frame_path in os.listdir(os.path.join(data_path, dir, video_dir)):
+                image_path = os.path.join(data_path, dir, video_dir, frame_path)
+                img = Image.open(image_path)
+                prob, bboxes_scaled = detect(model, img)
+                plot_results(img, prob, bboxes_scaled)
+
