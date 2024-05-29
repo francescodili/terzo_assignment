@@ -40,10 +40,10 @@ def rescale_bboxes(out_bbox, size):
     b = b * torch.tensor([img_w, img_h, img_w, img_h], dtype=torch.float32)
     return b
 
-def extract_crops(pil_img, boxes, crops, det_path=None):
+def extract_crops(pil_img, crops, boxes, det_path=None):
     # Convert PIL image to OpenCV format
     img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
-    if not crops: #Inizializzazione
+    if not crops:  # Inizializzazione
         id = 0
         for (xmin, ymin, xmax, ymax) in boxes.tolist():
             center = ((xmin + xmax) / 2, (ymin + ymax) / 2)
@@ -51,15 +51,16 @@ def extract_crops(pil_img, boxes, crops, det_path=None):
             crop = cv2.getRectSubPix(img, patchSize=(int(size[0]), int(size[1])), center=(center[0], center[1]))
             crops[id] = [crop, (xmin, ymin, xmax, ymax)]
             id += 1
-    else: 
+    else:
         for (xmin, ymin, xmax, ymax) in boxes.tolist():
             center = ((xmin + xmax) / 2, (ymin + ymax) / 2)
             size = (xmax - xmin, ymax - ymin)
             crop = cv2.getRectSubPix(img, patchSize=(int(size[0]), int(size[1])), center=(center[0], center[1]))
-            id = compare_crops(crop, crops, boxes, det_path)
+            id = compare_crops(crop, crops, (xmin, ymin, xmax, ymax), det_path)
             crops[id] = [crop, (xmin, ymin, xmax, ymax)]
 
     return crops
+
 
 
 def similarity_between_crops(crop1, crop2):
@@ -73,29 +74,55 @@ def similarity_between_crops(crop1, crop2):
     
     # Compute SSIM between two crops
     score, _ = ssim(crop1_gray, crop2_gray, full=True)
+    print(score)
     return score
 
 
-def compare_crops(crop, crops, boxes, det_path):
+def compare_crops(crop, crops, current_bbox, det_path):
     similarity = {}
-    for id, img in crops.items():
-        similarity[id] = similarity_between_crops(crop, img[0])  # valore tra 0 e 1 (0 totalmente diverse, 1 uguali)
+    distances = {}
+    box_center = lambda bbox: ((bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2)
+    crop_center = np.array(box_center(current_bbox))
 
-    max_sim = 0
+    # Carica i dati dal file det_path
+    pre_existing_boxes = []
+    if os.path.exists(det_path):
+        with open(det_path, 'r') as file:
+            for line in file:
+                data = line.strip().split(',')
+                id, xmin, ymin, xmax, ymax = int(data[0]), float(data[1]), float(data[2]), float(data[3]), float(data[4])
+                pre_existing_boxes.append((id, xmin, ymin, xmax, ymax))
+
+    for id, img in crops.items():
+        similarity[id] = similarity_between_crops(crop, img[0])
+        crop_bbox = img[1]
+        crop_bbox_center = np.array(box_center(crop_bbox))
+        distances[id] = np.linalg.norm(crop_bbox_center - crop_center)
+
+    max_score = 0
     max_id = -1
+
+    # Combina la similarità e la distanza per ottenere il punteggio finale
     for id, sim in similarity.items():
-        if sim > max_sim:
-            max_sim = sim
-            max_id = id
-    
-    if max_sim > 0.7:
+        if id in distances:
+            distance_score = max(1 - distances[id] / max(distances.values()), 0)
+            combined_score = sim * 0.7 + distance_score * 0.3
+            if combined_score > max_score:
+                max_score = combined_score
+                max_id = id
+
+    if max_score > 0.7:
         return max_id
-    else: #Crea un nuovo id se la similarità è minore di 0.7, perchè ancora non esiste questo pedone
+    else:
         return max(crops.keys()) + 1
+
+
+
+
 
 def save_boxes(crops, save_path):
     with open(save_path, 'w') as file:
-        for id, (crop, bbox) in crops.items():
+        for id, (_, bbox) in crops.items():
             file.flush()
             os.fsync(file.fileno())
             
@@ -157,7 +184,8 @@ def main():
                     
                     save_path = os.path.join(output_dir, frame_path)
                     det_path = os.path.join(output_dir, f'{frame_path}_det.txt')
-                    crops = extract_crops(img, bboxes_scaled, crops, det_path=det_path)
+
+                    crops = extract_crops(img, crops, bboxes_scaled, det_path=det_path)
                     save_boxes(crops, det_path)
                         
 

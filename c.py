@@ -1,5 +1,5 @@
 import requests
-import tensorflow as tf
+import chardet
 
 print("Requests version:", requests.__version__)
-print("TensorFlow version:", tf.__version__)
+print("Chardet version:", chardet.__version__)
