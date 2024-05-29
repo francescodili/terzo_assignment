@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import os
 import cv2
 import numpy as np
+from skimage.metrics import structural_similarity as ssim
 
 CLASSES = [
     'N/A', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
@@ -39,29 +40,71 @@ def rescale_bboxes(out_bbox, size):
     b = b * torch.tensor([img_w, img_h, img_w, img_h], dtype=torch.float32)
     return b
 
-def save_images(pil_img, prob, boxes, save_path=None):
+def extract_crops(pil_img, boxes, crops, det_path=None):
     # Convert PIL image to OpenCV format
     img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
-    for p, (xmin, ymin, xmax, ymax), c in zip(prob, boxes.tolist(), COLORS * 100):
-        cv2.rectangle(img, (int(xmin), int(ymin)), (int(xmax), int(ymax)), color=tuple(int(255 * i) for i in c), thickness=2)
-        #cl = p.argmax()
-        #text = f'{CLASSES[cl]}: {id}'
-        #cv2.putText(img, text, (int(xmin), int(ymin)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2, cv2.LINE_AA)
-    
-    if save_path:
-        cv2.imwrite(save_path, img)
-        print(f'Immagine salvata in {save_path}')
-    return img
+    if not crops: #Inizializzazione
+        id = 0
+        for (xmin, ymin, xmax, ymax) in boxes.tolist():
+            center = ((xmin + xmax) / 2, (ymin + ymax) / 2)
+            size = (xmax - xmin, ymax - ymin)
+            crop = cv2.getRectSubPix(img, patchSize=(int(size[0]), int(size[1])), center=(center[0], center[1]))
+            crops[id] = crop
+            id += 1
+    else: 
+        for (xmin, ymin, xmax, ymax) in boxes.tolist():
+            center = ((xmin + xmax) / 2, (ymin + ymax) / 2)
+            size = (xmax - xmin, ymax - ymin)
+            crop = cv2.getRectSubPix(img, patchSize=(int(size[0]), int(size[1])), center=(center[0], center[1]))
+            id = compare_crops(crop, crops, boxes, det_path)
+            crops[id] = crop
 
-def save_boxes(boxes, save_path='det.txt'):
+    return crops
+
+
+def similarity_between_crops(crop1, crop2):
+    # Converting images to grayscale
+    crop1_gray = cv2.cvtColor(crop1, cv2.COLOR_BGR2GRAY)
+    crop2_gray = cv2.cvtColor(crop2, cv2.COLOR_BGR2GRAY)
+    
+    # Compute SSIM between two crops
+    score, _ = ssim(crop1_gray, crop2_gray, full=True)
+    return score
+
+#def compare_crops(crop, crops, boxes, det_path):
+#    similarity = {}
+#    for id, img in crops.values():
+#        similarity[id] = similarity_between_crops(crop, img) #valore tra 0 e 1 (0 totalmente diverse, 1 uguali)
+#
+#    for id, sim in similarity.values():
+#        if sim > 0.7:
+
+
+def compare_crops(crop, crops):
+    similarity = {}
+    for id, img in crops.items():
+        similarity[id] = similarity_between_crops(crop, img)  # valore tra 0 e 1 (0 totalmente diverse, 1 uguali)
+
+    max_sim = 0
+    max_id = -1
+    for id, sim in similarity.items():
+        if sim > max_sim:
+            max_sim = sim
+            max_id = id
+    
+    if max_sim > 0.7:
+        return max_id
+    else:
+        return max(crops.keys()) + 1
+
+def save_boxes(boxes, idxs, save_path):
     with open(save_path, 'w') as file:
         count = 0
         for box in boxes.tolist():
-            if count % 10:
-                file.flush()
-                os.fsync(file.fileno())
+            file.flush()
+            os.fsync(file.fileno())
             
-            line = f'{box[0]}, {box[1]}, {box[2]}, {box[3]}\n'
+            line = f'{idxs[count]}, {box[0]}, {box[1]}, {box[2]}, {box[3]}\n'
             file.write(line)
             count += 1
     if not file.closed:
@@ -107,6 +150,7 @@ def main():
     model = torch.hub.load('facebookresearch/detr:main', 'detr_resnet50', pretrained=True)
     data_path = '../MOT17/train'
     output_path = '../bbox/train_bbox'
+    crops = {}
     for dir in os.listdir(data_path):
         for video_dir in os.listdir(os.path.join(data_path, dir)):
             if video_dir == 'img1':
@@ -119,8 +163,12 @@ def main():
                     output_dir = os.path.join(output_path, dir)
                     os.makedirs(output_dir, exist_ok=True)
                     
-                    save_images(img, prob, bboxes_scaled, os.path.join(output_dir, frame_path))
-                    save_boxes(bboxes_scaled, os.path.join(output_dir, 'det.txt'))
+                    save_path = os.path.join(output_dir, frame_path)
+                    det_path = os.path.join(output_dir, f'{frame_path}_det.txt')
+                    crops = extract_crops(img, bboxes_scaled, crops, det_path=det_path)
+                    save_boxes(bboxes_scaled, det_path)
+                        
+
                 
 
 if __name__=='__main__':
