@@ -4,7 +4,7 @@ import torchvision.transforms as T
 import matplotlib.pyplot as plt
 import os
 import cv2
-
+import numpy as np
 
 CLASSES = [
     'N/A', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
@@ -39,20 +39,37 @@ def rescale_bboxes(out_bbox, size):
     b = b * torch.tensor([img_w, img_h, img_w, img_h], dtype=torch.float32)
     return b
 
-def plot_results(pil_img, prob, boxes):
-    plt.figure(figsize=(16,10))
-    plt.imshow(pil_img)
-    ax = plt.gca()
+def save_images(pil_img, prob, boxes, save_path=None):
+    # Convert PIL image to OpenCV format
+    img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
     for p, (xmin, ymin, xmax, ymax), c in zip(prob, boxes.tolist(), COLORS * 100):
-        ax.add_patch(plt.Rectangle((xmin, ymin), xmax - xmin, ymax - ymin,
-                                   fill=False, color=c, linewidth=3))
-        cl = p.argmax()
-        text = f'{CLASSES[cl]}: {p[cl]:0.2f}'
-        ax.text(xmin, ymin, text, fontsize=15,
-                bbox=dict(facecolor='yellow', alpha=0.5))
-    plt.axis('off')
-    plt.show()
+        cv2.rectangle(img, (int(xmin), int(ymin)), (int(xmax), int(ymax)), color=tuple(int(255 * i) for i in c), thickness=2)
+        #cl = p.argmax()
+        #text = f'{CLASSES[cl]}: {id}'
+        #cv2.putText(img, text, (int(xmin), int(ymin)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2, cv2.LINE_AA)
     
+    if save_path:
+        cv2.imwrite(save_path, img)
+        print(f'Immagine salvata in {save_path}')
+    return img
+
+def save_boxes(boxes, save_path='det.txt'):
+    with open(save_path, 'w') as file:
+        count = 0
+        for box in boxes.tolist():
+            if count % 10:
+                file.flush()
+                os.fsync(file.fileno())
+            
+            line = f'{box[0]}, {box[1]}, {box[2]}, {box[3]}\n'
+            file.write(line)
+            count += 1
+    if not file.closed:
+            file.close()
+
+
+    
+
 def detect(model, im, transform = None, threshold_confidence = 0.7):
     if transform is None:
         # standard PyTorch mean-std input image normalization
@@ -85,14 +102,26 @@ def detect(model, im, transform = None, threshold_confidence = 0.7):
 
     return probas[keep][person_keep], bboxes_scaled[person_keep]
 
-model = torch.hub.load('facebookresearch/detr:main', 'detr_resnet50', pretrained=True)
-data_path = '../MOT17/train'
-for dir in os.listdir(data_path):
-    for video_dir in os.listdir(os.path.join(data_path, dir)):
-        if video_dir == 'img1':
-            for frame_path in os.listdir(os.path.join(data_path, dir, video_dir)):
-                image_path = os.path.join(data_path, dir, video_dir, frame_path)
-                img = Image.open(image_path)
-                prob, bboxes_scaled = detect(model, img)
-                plot_results(img, prob, bboxes_scaled)
 
+def main():
+    model = torch.hub.load('facebookresearch/detr:main', 'detr_resnet50', pretrained=True)
+    data_path = '../MOT17/train'
+    output_path = '../bbox/train_bbox'
+    for dir in os.listdir(data_path):
+        for video_dir in os.listdir(os.path.join(data_path, dir)):
+            if video_dir == 'img1':
+                for frame_path in os.listdir(os.path.join(data_path, dir, video_dir)):
+                    image_path = os.path.join(data_path, dir, video_dir, frame_path)
+                    img = Image.open(image_path)
+                    prob, bboxes_scaled = detect(model, img)
+                    
+                    # Crea la directory di output se non esiste
+                    output_dir = os.path.join(output_path, dir)
+                    os.makedirs(output_dir, exist_ok=True)
+                    
+                    save_images(img, prob, bboxes_scaled, os.path.join(output_dir, frame_path))
+                    save_boxes(bboxes_scaled, os.path.join(output_dir, 'det.txt'))
+                
+
+if __name__=='__main__':
+    main()
