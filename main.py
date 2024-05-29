@@ -49,7 +49,7 @@ def extract_crops(pil_img, boxes, crops, det_path=None):
             center = ((xmin + xmax) / 2, (ymin + ymax) / 2)
             size = (xmax - xmin, ymax - ymin)
             crop = cv2.getRectSubPix(img, patchSize=(int(size[0]), int(size[1])), center=(center[0], center[1]))
-            crops[id] = crop
+            crops[id] = [crop, (xmin, ymin, xmax, ymax)]
             id += 1
     else: 
         for (xmin, ymin, xmax, ymax) in boxes.tolist():
@@ -57,7 +57,7 @@ def extract_crops(pil_img, boxes, crops, det_path=None):
             size = (xmax - xmin, ymax - ymin)
             crop = cv2.getRectSubPix(img, patchSize=(int(size[0]), int(size[1])), center=(center[0], center[1]))
             id = compare_crops(crop, crops, boxes, det_path)
-            crops[id] = crop
+            crops[id] = [crop, (xmin, ymin, xmax, ymax)]
 
     return crops
 
@@ -66,24 +66,21 @@ def similarity_between_crops(crop1, crop2):
     # Converting images to grayscale
     crop1_gray = cv2.cvtColor(crop1, cv2.COLOR_BGR2GRAY)
     crop2_gray = cv2.cvtColor(crop2, cv2.COLOR_BGR2GRAY)
+
+    if crop1_gray.shape != crop2_gray.shape:
+        crop2_gray = cv2.resize(crop2_gray, (crop1_gray.shape[1], crop1_gray.shape[0]))
+    
     
     # Compute SSIM between two crops
     score, _ = ssim(crop1_gray, crop2_gray, full=True)
     return score
 
-#def compare_crops(crop, crops, boxes, det_path):
-#    similarity = {}
-#    for id, img in crops.values():
-#        similarity[id] = similarity_between_crops(crop, img) #valore tra 0 e 1 (0 totalmente diverse, 1 uguali)
-#
-#    for id, sim in similarity.values():
-#        if sim > 0.7:
 
 
-def compare_crops(crop, crops):
+def compare_crops(crop, crops, boxes, det_path):
     similarity = {}
     for id, img in crops.items():
-        similarity[id] = similarity_between_crops(crop, img)  # valore tra 0 e 1 (0 totalmente diverse, 1 uguali)
+        similarity[id] = similarity_between_crops(crop, img[0])  # valore tra 0 e 1 (0 totalmente diverse, 1 uguali)
 
     max_sim = 0
     max_id = -1
@@ -94,24 +91,20 @@ def compare_crops(crop, crops):
     
     if max_sim > 0.7:
         return max_id
-    else:
+    else: #Crea un nuovo id se la similarità è minore di 0.7, perchè ancora non esiste questo pedone
         return max(crops.keys()) + 1
 
-def save_boxes(boxes, idxs, save_path):
+def save_boxes(crops, save_path):
     with open(save_path, 'w') as file:
-        count = 0
-        for box in boxes.tolist():
+        for id, (crop, bbox) in crops.items():
             file.flush()
             os.fsync(file.fileno())
             
-            line = f'{idxs[count]}, {box[0]}, {box[1]}, {box[2]}, {box[3]}\n'
+            line = f'{id}, {bbox[0]}, {bbox[1]}, {bbox[2]}, {bbox[3]}\n'
             file.write(line)
-            count += 1
     if not file.closed:
             file.close()
 
-
-    
 
 def detect(model, im, transform = None, threshold_confidence = 0.7):
     if transform is None:
@@ -166,7 +159,7 @@ def main():
                     save_path = os.path.join(output_dir, frame_path)
                     det_path = os.path.join(output_dir, f'{frame_path}_det.txt')
                     crops = extract_crops(img, bboxes_scaled, crops, det_path=det_path)
-                    save_boxes(bboxes_scaled, det_path)
+                    save_boxes(crops, det_path)
                         
 
                 
