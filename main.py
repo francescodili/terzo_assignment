@@ -76,7 +76,6 @@ def similarity_between_crops(crop1, crop2):
     return score
 
 
-
 def compare_crops(crop, crops, boxes, det_path):
     similarity = {}
     for id, img in crops.items():
