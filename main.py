@@ -11,23 +11,16 @@ import detect_boxes
 
 
 def match_detections_to_tracks(detections, crops, tracks, resnet, iou_threshold=0.3, similarity_threshold=0.5):
-    num_tracks = len(tracks)
-    num_detections = len(detections)
-    
-    # Se non ci sono tracce, restituiamo le rilevazioni come non corrispondenti
-    if num_tracks == 0:
-        return np.empty((0, 2), dtype=int), np.arange(num_detections), np.empty((0, 4), dtype=int)
+    if len(tracks) == 0:
+        return np.empty((0, 2), dtype=int), np.arange(len(detections)), np.empty((0, 4), dtype=int)
 
     # Estrai le feature per tutti i crops delle detection e dei tracks
     detection_features = compare_crops.extract_features(crops, resnet)
     track_crops = [track.crop for track in tracks]
     track_features = compare_crops.extract_features(track_crops, resnet)
 
-    # Inizializza la matrice dei costi con dimensioni (num_tracks + num_detections) x (num_detections + num_tracks)
-    cost_matrix = np.zeros((num_tracks + num_detections, num_detections + num_tracks), dtype=np.float32)
-    cost_matrix.fill(1.0)  # Riempie la matrice dei costi con un valore elevato (costo massimo)
-
-    ssim_scores = np.zeros((num_tracks, num_detections), dtype=np.float32)
+    cost_matrix = np.zeros((len(tracks), len(detections)), dtype=np.float32)
+    ssim_scores = np.zeros((len(tracks), len(detections)), dtype=np.float32)
 
     for t, trk in enumerate(tracks):
         for d, det in enumerate(detections):
@@ -35,36 +28,31 @@ def match_detections_to_tracks(detections, crops, tracks, resnet, iou_threshold=
             similarity = compare_crops.compute_similarity(trk.bbox, det, ssim_scores[t, d], track_features[t], detection_features[d])
             cost_matrix[t, d] = 1 - similarity  # Convert similarity to cost
 
-    print("Cost matrix before normalization:\n", cost_matrix)
-
     # Normalizzare i valori della matrice tra 0 e 1
     if cost_matrix.max() > cost_matrix.min():  # Evita la divisione per zero
         cost_matrix = (cost_matrix - cost_matrix.min()) / (cost_matrix.max() - cost_matrix.min())
-    
-    print("Cost matrix after normalization:\n", cost_matrix)
+    print("Cost matrix:\n", cost_matrix)
 
     matched_indices = linear_sum_assignment(cost_matrix)
     print("Matched indices:", matched_indices)
 
     matched_indices = list(zip(matched_indices[0], matched_indices[1]))
-    unmatched_detections = list(set(range(num_detections)) - set(i for _, i in matched_indices if i < num_detections))
-    unmatched_tracks = list(set(range(num_tracks)) - set(t for t, _ in matched_indices if t < num_tracks))
+    unmatched_detections = list(set(range(len(detections))) - set(i for _, i in matched_indices))
+    unmatched_tracks = list(set(range(len(tracks))) - set(t for t, _ in matched_indices))
 
     matches = []
     for t, d in matched_indices:
-        if t < num_tracks and d < num_detections and cost_matrix[t, d] <= 1 - similarity_threshold:
+        if cost_matrix[t, d] <= 1 - similarity_threshold:
             matches.append((t, d))
-        elif t < num_tracks:
-            unmatched_tracks.append(t)
-        elif d < num_detections:
+        else:
             unmatched_detections.append(d)
+            unmatched_tracks.append(t)
 
     print("Matches:", matches)
     print("Unmatched detections:", unmatched_detections)
     print("Unmatched tracks:", unmatched_tracks)
 
     return matches, np.array(unmatched_detections), np.array(unmatched_tracks)
-
 
 
 def save_boxes(tracks, save_path):
