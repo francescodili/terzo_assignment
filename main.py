@@ -57,28 +57,11 @@ def extract_crops(pil_img, boxes):
         crops.append(crop)
     return crops
 
-def extract_features(crop, model):
-    crop = cv2.resize(crop, (224, 224))  # Ridimensiona l'immagine a 224x224
-    crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)  # Converti l'immagine in RGB
-    img_array = keras.utils.img_to_array(crop)
-    img_array = np.expand_dims(img_array, axis=0)
-    img_array = preprocess_input(img_array)
-    
-    features = model.predict(img_array)
-    return features.squeeze()
-
-def compute_similarity(box1, box2, crop1, crop2, resnet):
+def compute_similarity(box1, box2, ssim_score, features1, features2):
     iou = compute_iou(box1, box2)
-    ssim_score = similarity_between_crops(crop1, crop2)
-
-    # Estrai le feature dalle immagini ritagliate
-    features1 = extract_features(crop1, resnet)
-    features2 = extract_features(crop2, resnet)
 
     # Calcola la distanza del coseno tra le feature
     feature_distance = cosine(features1.flatten(), features2.flatten())
-
-    # Normalizza la distanza del coseno
     feature_similarity = 1 - feature_distance
 
     # Calcola la distanza tra i centri delle bounding box
@@ -95,39 +78,62 @@ def compute_similarity(box1, box2, crop1, crop2, resnet):
     return combined_similarity
 
 
+
+def extract_features(crops, model):
+    resized_crops = [cv2.resize(crop, (224, 224)) for crop in crops]  # Ridimensiona tutte le immagini a 224x224
+    rgb_crops = [cv2.cvtColor(crop, cv2.COLOR_BGR2RGB) for crop in resized_crops]  # Converti tutte le immagini in RGB
+    img_arrays = np.array([keras.utils.img_to_array(crop) for crop in rgb_crops])
+    img_arrays = preprocess_input(img_arrays)
+    
+    features = model.predict(img_arrays)
+    return features
+
 def match_detections_to_tracks(detections, crops, tracks, resnet, iou_threshold=0.3, similarity_threshold=0.5):
     if len(tracks) == 0:
         return np.empty((0, 2), dtype=int), np.arange(len(detections)), np.empty((0, 4), dtype=int)
 
-    cost_matrix = np.zeros((len(detections), len(tracks)), dtype=np.float32)
+    # Estrai le feature per tutti i crops delle detection e dei tracks
+    detection_features = extract_features(crops, resnet)
+    track_crops = [track.crop for track in tracks]
+    track_features = extract_features(track_crops, resnet)
 
-    for d, det in enumerate(detections):
-        for t, trk in enumerate(tracks):
-            similarity = compute_similarity(det, trk.bbox, crops[d], trk.crop, resnet)
-            cost_matrix[d, t] = 1 - similarity  # Convert similarity to cost
+    cost_matrix = np.zeros((len(tracks), len(detections)), dtype=np.float32)
+    ssim_scores = np.zeros((len(tracks), len(detections)), dtype=np.float32)
 
+    for t, trk in enumerate(tracks):
+        for d, det in enumerate(detections):
+            ssim_scores[t, d] = similarity_between_crops(trk.crop, crops[d])
+            similarity = compute_similarity(trk.bbox, det, ssim_scores[t, d], track_features[t], detection_features[d])
+            cost_matrix[t, d] = 1 - similarity  # Convert similarity to cost
+
+    # Normalizzare i valori della matrice tra 0 e 1
+    if cost_matrix.max() > cost_matrix.min():  # Evita la divisione per zero
+        cost_matrix = (cost_matrix - cost_matrix.min()) / (cost_matrix.max() - cost_matrix.min())
+    print("Cost matrix:\n", cost_matrix)
 
     matched_indices = linear_sum_assignment(cost_matrix)
+    print("Matched indices:", matched_indices)
 
-    unmatched_detections = []
-    for d in range(len(detections)):
-        if d not in matched_indices[0]:
-            unmatched_detections.append(d)
-
-    unmatched_tracks = []
-    for t in range(len(tracks)):
-        if t not in matched_indices[1]:
-            unmatched_tracks.append(t)
+    matched_indices = list(zip(matched_indices[0], matched_indices[1]))
+    unmatched_detections = list(set(range(len(detections))) - set(i for _, i in matched_indices))
+    unmatched_tracks = list(set(range(len(tracks))) - set(t for t, _ in matched_indices))
 
     matches = []
-    for m in zip(matched_indices[0], matched_indices[1]):
-        if cost_matrix[m[0], m[1]] > 1 - similarity_threshold:
-            unmatched_detections.append(m[0])
-            unmatched_tracks.append(m[1])
+    for t, d in matched_indices:
+        if cost_matrix[t, d] <= 1 - similarity_threshold:
+            matches.append((t, d))
         else:
-            matches.append(m)
+            unmatched_detections.append(d)
+            unmatched_tracks.append(t)
+
+    print("Matches:", matches)
+    print("Unmatched detections:", unmatched_detections)
+    print("Unmatched tracks:", unmatched_tracks)
 
     return matches, np.array(unmatched_detections), np.array(unmatched_tracks)
+
+
+
 
 def compute_iou(box1, box2):
     x1, y1, x2, y2 = box1
@@ -233,23 +239,40 @@ class Tracker:
     def update_tracks(self, detected_bboxes, crops):
         current_tracks = list(self.tracks.values())
         matches, unmatched_detections, unmatched_tracks = match_detections_to_tracks(detected_bboxes, crops, current_tracks, self.resnet)
-        
+
+        print("Current tracks before update:", [(track.track_id, track.bbox) for track in current_tracks])
+        print("Matches:", matches)
+        print("Unmatched detections:", unmatched_detections)
+        print("Unmatched tracks:", unmatched_tracks)
+
         for match in matches:
-            detection_idx, track_idx = match
-            track_id = current_tracks[track_idx].track_id
-            self.tracks[track_id].update(detected_bboxes[detection_idx], crops[detection_idx])
+            track_idx, detection_idx = match
+            if track_idx < len(current_tracks):
+                track_id = current_tracks[track_idx].track_id
+                self.tracks[track_id].update(detected_bboxes[detection_idx], crops[detection_idx])
+            else:
+                print(f"Warning: track_idx {track_idx} out of range for current_tracks")
 
         for track_idx in unmatched_tracks:
-            track_id = current_tracks[track_idx].track_id
-            self.tracks[track_id].increment_skipped_frames()
-            if self.tracks[track_id].is_lost():
-                del self.tracks[track_id]
+            if track_idx < len(current_tracks):
+                track_id = current_tracks[track_idx].track_id
+                self.tracks[track_id].increment_skipped_frames()
+                if self.tracks[track_id].is_lost():
+                    del self.tracks[track_id]
+            else:
+                print(f"Warning: track_idx {track_idx} out of range for current_tracks")
 
         for detection_idx in unmatched_detections:
             self.add_track(detected_bboxes[detection_idx], crops[detection_idx])
 
+        print("Tracks after update:", [(track.track_id, track.bbox) for track in self.tracks.values()])
+
     def get_active_tracks(self):
         return [track for track in self.tracks.values() if not track.is_lost()]
+
+
+
+
 
 
 def draw_boxes(img, boxes, ids, colors=None):
