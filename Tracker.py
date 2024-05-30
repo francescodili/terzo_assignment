@@ -9,7 +9,7 @@ class Tracker:
         self.resnet = ResNet50(weights='imagenet', include_top=False)
 
     def add_track(self, bbox, crop):
-        self.tracks[self.next_id] = Track(self.next_id, bbox, crop)
+        self.tracks[self.next_id] = Track.Track(self.next_id, bbox, crop)
         self.next_id += 1
 
     def update_tracks(self, detected_bboxes, crops):
