@@ -10,7 +10,7 @@ import compare_crops
 import detect_boxes
 
 
-def match_detections_to_tracks(detections, crops, tracks, resnet, iou_threshold=0.3, similarity_threshold=0.5):
+def match_detections_to_tracks(detections, crops, tracks, resnet, similarity_threshold=0.7):
     if len(tracks) == 0:
         return np.empty((0, 2), dtype=int), np.arange(len(detections)), np.empty((0, 4), dtype=int)
 
