@@ -69,7 +69,7 @@ def detect(model, im, transform = None, threshold_confidence = 0.7):
     return probas[keep][person_keep], bboxes_scaled[person_keep]
 
 
-def draw_boxes(img, boxes, ids, colors=None):
+def draw_boxes(img, boxes, ids, colors=[0.000, 0.447, 0.741]):
     img = np.array(img)
     for i, (xmin, ymin, xmax, ymax) in enumerate(boxes):
         color = colors[i % len(colors)] if colors else [0, 255, 0]

@@ -25,16 +25,16 @@ def match_detections_to_tracks(detections, crops, tracks, resnet, iou_threshold=
     for t, trk in enumerate(tracks):
         for d, det in enumerate(detections):
             ssim_scores[t, d] = compare_crops.similarity_between_crops(trk.crop, crops[d])
-            similarity = compare_crops.compute_similarity(trk.bbox, det, ssim_scores[t, d], track_features[t], detection_features[d])
+            similarity = compare_crops.compute_similarity(trk.bbox, det, ssim_scores[t, d], track_features[t], detection_features[d], trk.crop, crops[d])
             cost_matrix[t, d] = 1 - similarity  # Convert similarity to cost
 
     # Normalizzare i valori della matrice tra 0 e 1
     if cost_matrix.max() > cost_matrix.min():  # Evita la divisione per zero
         cost_matrix = (cost_matrix - cost_matrix.min()) / (cost_matrix.max() - cost_matrix.min())
-    print("Cost matrix:\n", cost_matrix)
+    #print("Cost matrix:\n", cost_matrix)
 
     matched_indices = linear_sum_assignment(cost_matrix)
-    print("Matched indices:", matched_indices)
+    #print("Matched indices:", matched_indices)
 
     matched_indices = list(zip(matched_indices[0], matched_indices[1]))
     unmatched_detections = list(set(range(len(detections))) - set(i for _, i in matched_indices))
@@ -48,9 +48,9 @@ def match_detections_to_tracks(detections, crops, tracks, resnet, iou_threshold=
             unmatched_detections.append(d)
             unmatched_tracks.append(t)
 
-    print("Matches:", matches)
-    print("Unmatched detections:", unmatched_detections)
-    print("Unmatched tracks:", unmatched_tracks)
+    #print("Matches:", matches)
+    #print("Unmatched detections:", unmatched_detections)
+    #print("Unmatched tracks:", unmatched_tracks)
 
     return matches, np.array(unmatched_detections), np.array(unmatched_tracks)
 

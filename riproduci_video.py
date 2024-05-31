@@ -29,7 +29,7 @@ def play_video_from_frames(folder_path, frame_rate=30):
             continue
 
         cv2.imshow('Video', frame)
-        key = cv2.waitKey(int(10000 / frame_rate))  # Attendi per il tempo specificato in millisecondi
+        key = cv2.waitKey(int(1000 / frame_rate))  # Attendi per il tempo specificato in millisecondi
 
         # Premere 'q' per uscire dalla riproduzione
         if key & 0xFF == ord('q'):

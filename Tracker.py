@@ -18,10 +18,10 @@ class Tracker:
         current_tracks = list(self.tracks.values())
         matches, unmatched_detections, unmatched_tracks = match_detections_to_tracks(detected_bboxes, crops, current_tracks, self.resnet)
 
-        print("Current tracks before update:", [(track.track_id, track.bbox) for track in current_tracks])
-        print("Matches:", matches)
-        print("Unmatched detections:", unmatched_detections)
-        print("Unmatched tracks:", unmatched_tracks)
+        #print("Current tracks before update:", [(track.track_id, track.bbox) for track in current_tracks])
+        #print("Matches:", matches)
+        #print("Unmatched detections:", unmatched_detections)
+        #print("Unmatched tracks:", unmatched_tracks)
 
         for match in matches:
             track_idx, detection_idx = match
@@ -45,7 +45,7 @@ class Tracker:
         for detection_idx in unmatched_detections:
             self.add_track(detected_bboxes[detection_idx], crops[detection_idx])
 
-        print("Tracks after update:", [(track.track_id, track.bbox) for track in self.tracks.values()])
+        #print("Tracks after update:", [(track.track_id, track.bbox) for track in self.tracks.values()])
 
     def get_active_tracks(self):
         return [track for track in self.tracks.values() if not track.is_lost()]
