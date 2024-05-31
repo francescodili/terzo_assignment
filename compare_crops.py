@@ -19,7 +19,6 @@ def extract_crops(pil_img, boxes):
     return crops
 
 
-
 def normalize_similarity(value, min_val, max_val):
     """Normalizza il valore tra min_val e max_val a un range di 0 a 1."""
     return (value - min_val) / (max_val - min_val)
@@ -30,19 +29,6 @@ def compute_histogram_similarity(crop1, crop2):
     hist2 = cv2.calcHist([crop2], [0, 1, 2], None, [8, 8, 8], [0, 256, 0, 256, 0, 256])
     hist_similarity = cv2.compareHist(hist1, hist2, cv2.HISTCMP_CORREL)
     return normalize_similarity(hist_similarity, -1, 1)
-
-def compute_texture_similarity(crop1, crop2):
-    """Calcola la similarità tra le texture usando LBP e la normalizza tra 0 e 1."""
-    lbp1 = local_binary_pattern(cv2.cvtColor(crop1, cv2.COLOR_BGR2GRAY), 8, 1, method="uniform")
-    lbp2 = local_binary_pattern(cv2.cvtColor(crop2, cv2.COLOR_BGR2GRAY), 8, 1, method="uniform")
-    lbp_hist1, _ = np.histogram(lbp1, bins=np.arange(0, 10), range=(0, 9))
-    lbp_hist2, _ = np.histogram(lbp2, bins=np.arange(0, 10), range=(0, 9))
-    lbp_hist1 = lbp_hist1.astype("float32")
-    lbp_hist2 = lbp_hist2.astype("float32")
-    lbp_hist1 /= (lbp_hist1.sum() + 1e-6)
-    lbp_hist2 /= (lbp_hist2.sum() + 1e-6)
-    texture_similarity = cv2.compareHist(lbp_hist1, lbp_hist2, cv2.HISTCMP_CORREL)
-    return normalize_similarity(texture_similarity, -1, 1)
 
 
 def compute_similarity(box1, box2, ssim_score, features1, features2, crop1, crop2):
@@ -63,16 +49,12 @@ def compute_similarity(box1, box2, ssim_score, features1, features2, crop1, crop
     # Calcolo della similarità tra istogrammi di colore
     hist_similarity = compute_histogram_similarity(crop1, crop2)
 
-    # Calcolo della similarità tra texture usando LBP
-    texture_similarity = compute_texture_similarity(crop1, crop2)
-
     combined_similarity = (
-        0.4 * feature_similarity + 
+        0.45 * feature_similarity + 
         0.2 * iou + 
         0.1 * ssim_score + 
         0.1 * normalized_center_similarity + 
-        0.1 * hist_similarity + 
-        0.1 * texture_similarity
+        0.05 * hist_similarity
     )
     
     return combined_similarity
