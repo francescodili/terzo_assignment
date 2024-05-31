@@ -32,9 +32,10 @@ def compute_similarity(box1, box2, ssim_score, features1, features2):
     # Normalizza la distanza del centro
     max_dim = max(box1[2] - box1[0], box1[3] - box1[1])
     normalized_center_distance = center_distance / max_dim
+    normalizaed_center_similarity = 1 - normalized_center_distance
 
     # Calcola una similarità combinata
-    combined_similarity = 0.4 * iou + 0.3 * ssim_score + 0.2 * feature_similarity - 0.1 * normalized_center_distance
+    combined_similarity = 0.1 * iou + 0.3 * ssim_score + 0.4 * feature_similarity + 0.2 * normalizaed_center_similarity
     return combined_similarity
 
 def extract_features(crops, model):
@@ -45,8 +46,6 @@ def extract_features(crops, model):
     
     features = model.predict(img_arrays)
     return features
-
-
 
 def compute_iou(box1, box2):
     x1, y1, x2, y2 = box1

@@ -7,9 +7,11 @@ class Tracker:
         self.tracks = {}
         self.next_id = 0
         self.resnet = ResNet50(weights='imagenet', include_top=False)
+        self.lost_tracks = {}  # Dizionario per tracciare i frame persi
 
     def add_track(self, bbox, crop):
         self.tracks[self.next_id] = Track.Track(self.next_id, bbox, crop)
+        self.lost_tracks[self.next_id] = 0  # Inizializza il contatore di frame persi a 0
         self.next_id += 1
 
     def update_tracks(self, detected_bboxes, crops):
@@ -26,15 +28,17 @@ class Tracker:
             if track_idx < len(current_tracks):
                 track_id = current_tracks[track_idx].track_id
                 self.tracks[track_id].update(detected_bboxes[detection_idx], crops[detection_idx])
+                self.lost_tracks[track_id] = 0  # Reset del contatore di frame persi
             else:
                 print(f"Warning: track_idx {track_idx} out of range for current_tracks")
 
         for track_idx in unmatched_tracks:
             if track_idx < len(current_tracks):
                 track_id = current_tracks[track_idx].track_id
-                self.tracks[track_id].increment_skipped_frames()
-                if self.tracks[track_id].is_lost():
+                self.lost_tracks[track_id] += 1  # Incrementa il contatore di frame persi
+                if self.lost_tracks[track_id] > 10:  # Soglia per rimuovere il track
                     del self.tracks[track_id]
+                    del self.lost_tracks[track_id]  # Rimuove anche dal dizionario dei frame persi
             else:
                 print(f"Warning: track_idx {track_idx} out of range for current_tracks")
 
