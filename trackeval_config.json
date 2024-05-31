@@ -1,6 +1,6 @@
 {
-    "GT_FOLDER": "path/to/gt_json_folder",
-    "TRACKERS_FOLDER": "path/to/trackeval_output_folder",
+    "GT_FOLDER": "../MOT17/train",
+    "TRACKERS_FOLDER": "../MOT17/train",
     "SPLIT_TO_EVAL": "val",
     "METRICS": ["HOTA", "CLEAR"],
     "DO_PREPROC": false,
@@ -8,5 +8,4 @@
     "GT_LOC_FORMAT": "{gt_folder}/{seq}.json",
     "OUTPUT_LOC_FORMAT": "{trackers_folder}/{tracker}/{seq}.json",
     "PRINT_CONFIG": true
-  }
-  
+}

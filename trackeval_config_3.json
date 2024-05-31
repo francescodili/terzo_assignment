@@ -1,0 +1,1 @@
+{"GT_FOLDER": "../MOT17/train", "TRACKERS_FOLDER": "../MOT17/train", "SPLIT_TO_EVAL": "val", "METRICS": ["HOTA", "CLEAR"], "DO_PREPROC": false, "TRACKERS_TO_EVAL": ["my_tracker"], "GT_LOC_FORMAT": "{gt_folder}/{seq}.json", "SEQMAP_FILE": "../MOT17/train/seqmaps/MOT17-val.txt", "PRINT_CONFIG": true, "THRESHOLD": 0.9}
