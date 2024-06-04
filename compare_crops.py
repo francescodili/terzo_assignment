@@ -50,10 +50,10 @@ def compute_similarity(box1, box2, ssim_score, features1, features2, crop1, crop
     hist_similarity = compute_histogram_similarity(crop1, crop2)
 
     combined_similarity = (
-        0.45 * feature_similarity + 
+        0.5 * feature_similarity + 
         0.2 * iou + 
         0.1 * ssim_score + 
-        0.1 * normalized_center_similarity + 
+        0.15 * normalized_center_similarity + 
         0.05 * hist_similarity
     )
     
