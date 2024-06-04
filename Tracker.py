@@ -1,6 +1,6 @@
 from keras.applications.resnet50 import ResNet50
 from main import match_detections_to_tracks
-import Track
+from Track import Track
 import logging
 
 logging.basicConfig(level=logging.INFO)

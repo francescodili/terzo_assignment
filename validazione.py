@@ -17,40 +17,40 @@ def read_gt_file(gt_file):
                        names=["frame", "id", "bb_left", "bb_top", "bb_width", "bb_height", "score", "class", "visibility"])
 
 
-def generate_output_files(data_path, output_path, tracker, model, similarity_threshold):
-    output_files = []
+def generate_output_files(data_path, output_path, tracker, model, i):
+    output_files = {}  # Crea un dizionario vuoto
     for dir in os.listdir(data_path):
         for video_dir in os.listdir(os.path.join(data_path, dir)):
             if video_dir == 'img1':
-                video_output_path = os.path.join(output_path, dir, f'output_{similarity_threshold}_sim.txt')
-                output_files.append(video_output_path)
+                video_output_path = os.path.join(output_path, dir, f'output_{i}_sim.txt')
+                if dir not in output_files:
+                    output_files[dir] = []  # Crea una lista vuota per la chiave 'dir'
                 os.makedirs(os.path.join(output_path, dir), exist_ok=True)
-
-                with open(video_output_path, 'w') as file:
-                    file.write("frame, id, bb_left, bb_top, bb_width, bb_height, conf, x, y, z\n")
-
 
                 for frame_path in os.listdir(os.path.join(data_path, dir, video_dir)):
                     image_path = os.path.join(data_path, dir, video_dir, frame_path)
                     img = Image.open(image_path)
                     frame_number = int(frame_path.split('.')[0])
-                    prob, bboxes_scaled = detect_boxes.detect(model, img)                  
+                    prob, bboxes_scaled = detect_boxes.detect(model, img)
 
                     crops = compare_crops.extract_crops(img, bboxes_scaled)
                     tracker.update_tracks(bboxes_scaled.tolist(), crops)
                     active_tracks = tracker.get_active_tracks()
 
                     save_boxes(active_tracks, frame_number, video_output_path, prob.tolist())
+                    output_files[dir].append(video_output_path)  # Aggiungi 'video_output_path' alla lista associata alla chiave 'dir'
+
     return output_files
 
+
 def take_gt_files(data_path): 
-    gt_files = []
+    gt_files = {}
     for dir in os.listdir(data_path):
         gt_dir = os.path.join(data_path, dir, 'gt')
         if os.path.isdir(gt_dir):
             gt_file_path = os.path.join(gt_dir, 'gt.txt')
             if os.path.exists(gt_file_path):
-                gt_files.append(gt_file_path)
+                gt_files[dir] = gt_file_path
     return gt_files
 
 
@@ -102,19 +102,23 @@ def main():
     model = torch.hub.load('facebookresearch/detr:main', 'detr_resnet50', pretrained=True)
     #Carico in una lista i percorsi dei file gt
     gt_files = take_gt_files(data_path)
+    print(gt_files)
 
     similarity_thresholds = [0.3, 0.5, 0.7, 0.9]
 
     for i, similarity_threshold in enumerate(similarity_thresholds):
         tracker = Tracker.Tracker(similarity_threshold)
 
-        output_files = generate_output_files(data_path, output_path, tracker, model, similarity_threshold)
+        output_files = generate_output_files(data_path, output_path, tracker, model, i)
 
-        #TODO
-        #Accoppiare output_file e gt_file e passarli in un for a run_trackeval
 
-    # Esegue TrackEval
-    run_trackeval('../MOT17/train', '../bbox/train_bbox', 'results/')
+    for key, value in output_files.items():
+        gt_path = gt_files[key]
+
+
+
+        # Esegue TrackEval
+        run_trackeval(gt_path, value, f'results/eval_{key}_{value}.txt')
 
 
 if __name__ == "__main__":
