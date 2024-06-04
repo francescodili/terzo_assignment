@@ -114,7 +114,7 @@ def main():
         #Accoppiare output_file e gt_file e passarli in un for a run_trackeval
 
     # Esegue TrackEval
-    run_trackeval('../MOT17/train', '../bbox/train_bbox')
+    run_trackeval('../MOT17/train', '../bbox/train_bbox', 'results/')
 
 
 if __name__ == "__main__":
