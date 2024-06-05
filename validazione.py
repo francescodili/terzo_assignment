@@ -113,17 +113,15 @@ def run_trackeval(gt_folder, results_folder, eval_path):
     metrics_list = [metrics.HOTA(), metrics.CLEAR()]
     evaluator.evaluate(dataset_list, metrics_list)
 
-def main():
-    data_path = '../MOT17/train'
-    output_path = '../bbox/train_bbox'
+def main(data_path, output_path, similarity_thresholds):
     model = torch.hub.load('facebookresearch/detr:main', 'detr_resnet50', pretrained=True)
-
-    similarity_thresholds = [0.3, 0.5, 0.7, 0.9]
 
     for i, similarity_threshold in enumerate(similarity_thresholds):
         output_files = generate_output_files(data_path, output_path, similarity_threshold, model, i)
+    
+    return output_files
 
-
+def do_valutation(data_path, output_path, similarity_thresholds):
     #Carico in una lista i percorsi dei file gt
     gt_files = take_gt_files(data_path)
     if output_files is None:
@@ -137,4 +135,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    data_path = '../MOT17/train'
+    output_path = '../bbox/train_bbox'
+    similarity_thresholds = [0.3, 0.5, 0.7, 0.9]
+
+    output_files = main(data_path, output_path, similarity_thresholds)
+    do_valutation(data_path, output_path, similarity_thresholds, output_files)
