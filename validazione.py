@@ -11,14 +11,14 @@ from TrackEval.trackeval import Evaluator, datasets, metrics
 def generate_output_files(data_path, output_path, similarity_threshold, model, train_dir = 'MOT17-train'):
     output_files = {}
     threshold_dir = f'sim_0{int(similarity_threshold * 10):01d}'
-    for dir in os.listdir(data_path):
-        for video_dir in os.listdir(os.path.join(data_path, dir)):
+    video_path = os.path.join(data_path, train_dir)
+    for dir in os.listdir(video_path):
+        for video_dir in os.listdir(os.path.join(video_path, dir)):
             if video_dir == 'img1':
-                video_output_path = os.path.join(output_path, threshold_dir, train_dir, f'{dir}.txt')
+                video_output_path = os.path.join(output_path, threshold_dir, train_dir, 'default_tracker', 'data' ,f'{dir}.txt')
                 print(video_output_path)
                 if dir not in output_files:
                     output_files[dir] = []
-                os.makedirs(os.path.join(output_path, threshold_dir, dir), exist_ok=True)
 
                 if os.path.exists(video_output_path):
                     print(f'{video_output_path} già esiste')
@@ -26,8 +26,8 @@ def generate_output_files(data_path, output_path, similarity_threshold, model, t
 
                 tracker = Tracker.Tracker(similarity_threshold)
 
-                for frame_path in os.listdir(os.path.join(data_path, dir, video_dir)):
-                    image_path = os.path.join(data_path, dir, video_dir, frame_path)
+                for frame_path in os.listdir(os.path.join(video_path, dir, video_dir)):
+                    image_path = os.path.join(video_path, dir, video_dir, frame_path)
                     img = Image.open(image_path)
                     frame_number = int(frame_path.split('.')[0])
                     prob, bboxes_scaled = detect_boxes.detect(model, img)
@@ -150,7 +150,7 @@ def select_best_tracker():
         required_columns = ['HOTA', 'CLR_Re', 'CLR_Pr', 'MOTA', 'MOTP']
         for col in required_columns:
             if col not in df.columns:
-                raise ValueError(f"La colonna '{col}' non è presente nei dati.")
+                print(f"La colonna '{col}' non è presente nei dati.")
         
         hota = df['HOTA'].mean()
         clear_re = df['CLR_Re'].mean()
