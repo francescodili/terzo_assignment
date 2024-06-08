@@ -89,8 +89,14 @@ def similarity_between_crops(crop1, crop2):
     crop1_gray = cv2.cvtColor(crop1, cv2.COLOR_BGR2GRAY)
     crop2_gray = cv2.cvtColor(crop2, cv2.COLOR_BGR2GRAY)
 
+    # Verifica che entrambe le immagini siano almeno 7x7
+    min_size = 7
+    if crop1_gray.shape[0] < min_size or crop1_gray.shape[1] < min_size or crop2_gray.shape[0] < min_size or crop2_gray.shape[1] < min_size:
+        return 0  # Ritorna 0
+
     if crop1_gray.shape != crop2_gray.shape:
         crop2_gray = cv2.resize(crop2_gray, (crop1_gray.shape[1], crop1_gray.shape[0]))
-
+    
+    
     score, _ = ssim(crop1_gray, crop2_gray, full=True)
     return score
