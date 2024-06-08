@@ -7,16 +7,8 @@ import torch
 import Tracker
 from TrackEval.trackeval import Evaluator, datasets, metrics
 
-def read_output_file(output_file):
-    return pd.read_csv(output_file, sep=",", header=0, 
-                       names=["frame", "id", "bb_left", "bb_top", "bb_width", "bb_height", "conf", "x", "y", "z"])
 
-def read_gt_file(gt_file):
-    return pd.read_csv(gt_file, sep=",", header=None, 
-                       names=["frame", "id", "bb_left", "bb_top", "bb_width", "bb_height", "score", "class", "visibility"])
-
-def generate_output_files(data_path, output_path, similarity_threshold, model, i):
-    train_dir = 'MOT17-train'
+def generate_output_files(data_path, output_path, similarity_threshold, model, train_dir = 'MOT17-train'):
     output_files = {}
     threshold_dir = f'sim_0{int(similarity_threshold * 10):01d}'
     for dir in os.listdir(data_path):
@@ -51,14 +43,6 @@ def generate_output_files(data_path, output_path, similarity_threshold, model, i
         return None
     return output_files
 
-def take_gt_paths(data_path): 
-    gt_folders = {}
-    for dir in os.listdir(data_path):
-        dir_path = os.path.join(data_path, dir)
-        gt_dir = os.path.join(dir_path, 'gt')
-        if os.path.isdir(gt_dir):
-            gt_folders[dir] = dir_path
-    return gt_folders
 
 def take_output_files(output_path, similarity_thresholds):
     output_folders = []
@@ -121,8 +105,8 @@ def run_trackeval(gt_folder, trackers_folder, eval_path):
 def gen_files(data_path, output_path, similarity_thresholds):
     model = torch.hub.load('facebookresearch/detr:main', 'detr_resnet50', pretrained=True)
 
-    for i, similarity_threshold in enumerate(similarity_thresholds):
-        generate_output_files(data_path, output_path, similarity_threshold, model, i)
+    for similarity_threshold in similarity_thresholds:
+        generate_output_files(data_path, output_path, similarity_threshold, model)
     
 
 def do_valutation(gt_folder, output_path, similarity_thresholds):    
