@@ -1,6 +1,5 @@
 import  torch
 from PIL import Image
-import matplotlib.pyplot as plt
 import os
 import cv2
 import numpy as np

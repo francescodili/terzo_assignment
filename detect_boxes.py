@@ -2,6 +2,7 @@ import  torch
 import torchvision.transforms as T
 import cv2
 import numpy as np
+import random
 
 CLASSES = [
     'N/A', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
@@ -69,10 +70,14 @@ def detect(model, im, transform = None, threshold_confidence = 0.7):
     return probas[keep][person_keep], bboxes_scaled[person_keep]
 
 
-def draw_boxes(img, boxes, ids, colors=[0.000, 0.447, 0.741]):
+def draw_boxes(img, boxes, ids, colors):
     img = np.array(img)
     for i, (xmin, ymin, xmax, ymax) in enumerate(boxes):
-        color = colors[i % len(colors)] if colors else [0, 255, 0]
+        color = colors[ids[i]]
         cv2.rectangle(img, (int(xmin), int(ymin)), (int(xmax), int(ymax)), color, 2)
         cv2.putText(img, f"ID: {ids[i]}", (int(xmin), int(ymin) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
     return img
+
+def generate_unique_colors(n):
+    random.seed(42)
+    return [(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)) for _ in range(n)]

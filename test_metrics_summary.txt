@@ -1,0 +1,11 @@
+	HOTA	MOTA	MOTP	CLR_Re	CLR_Pr	sMOTA
+test_results	23.176	28.931	77.827	48.079	74.13	18.27
+
+
+Il miglior video e':
+MOT17-09-DPM
+    7.119116
+
+Il peggior video e':
+MOT17-04-DPM
+    2.918497

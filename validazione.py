@@ -87,6 +87,7 @@ def run_trackeval(gt_folder, trackers_folder, eval_path):
         'CLASSES_TO_EVAL': ['pedestrian'],
         'BENCHMARK': 'MOT17',
         'SEQMAP_FILE': os.path.abspath('../MOT17/seqmaps/MOT17-train.txt'),
+        'SPLIT_TO_EVAL': 'train',  # Valid: 'train', 'test', 'all'
         'GT_LOC_FORMAT': '{gt_folder}/{seq}/gt/gt.txt'
     }
 
@@ -152,11 +153,11 @@ def select_best_tracker():
             if col not in df.columns:
                 print(f"La colonna '{col}' non è presente nei dati.")
         
-        hota = df['HOTA'].mean()
-        clear_re = df['CLR_Re'].mean()
-        clear_pr = df['CLR_Pr'].mean()
-        mota = df['MOTA'].mean()
-        motp = df['MOTP'].mean()
+        hota = df['HOTA']
+        clear_re = df['CLR_Re']
+        clear_pr = df['CLR_Pr']
+        mota = df['MOTA']
+        motp = df['MOTP']
         return {'HOTA': hota, 'CLR_Re': clear_re, 'CLR_Pr': clear_pr, 'MOTA': mota, 'MOTP': motp}
 
     # Calcola le metriche per ciascun tracker
