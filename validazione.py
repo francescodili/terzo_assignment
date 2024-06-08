@@ -1,12 +1,11 @@
+import os
 import pandas as pd
 import compare_crops
 import detect_boxes
-import os
 from PIL import Image
-import  torch
+import torch
 import Tracker
 from TrackEval.trackeval import Evaluator, datasets, metrics
-
 
 def read_output_file(output_file):
     return pd.read_csv(output_file, sep=",", header=0, 
@@ -16,20 +15,19 @@ def read_gt_file(gt_file):
     return pd.read_csv(gt_file, sep=",", header=None, 
                        names=["frame", "id", "bb_left", "bb_top", "bb_width", "bb_height", "score", "class", "visibility"])
 
-
 def generate_output_files(data_path, output_path, similarity_threshold, model, i):
-    output_files = {}  # Crea un dizionario vuoto
+    train_dir = 'MOT17-train'
+    output_files = {}
     threshold_dir = f'sim_0{int(similarity_threshold * 10):01d}'
     for dir in os.listdir(data_path):
         for video_dir in os.listdir(os.path.join(data_path, dir)):
             if video_dir == 'img1':
-                video_output_path = os.path.join(output_path, threshold_dir, dir, f'output_{i}_sim.txt')
+                video_output_path = os.path.join(output_path, threshold_dir, train_dir, f'{dir}.txt')
                 print(video_output_path)
                 if dir not in output_files:
-                    output_files[dir] = []  # Crea una lista vuota per la chiave 'dir'
+                    output_files[dir] = []
                 os.makedirs(os.path.join(output_path, threshold_dir, dir), exist_ok=True)
 
-                # Se il file esiste già, passa all'iterazione successiva
                 if os.path.exists(video_output_path):
                     print(f'{video_output_path} già esiste')
                     continue
@@ -47,12 +45,11 @@ def generate_output_files(data_path, output_path, similarity_threshold, model, i
                     active_tracks = tracker.get_active_tracks()
 
                     save_boxes(active_tracks, frame_number, video_output_path, prob.tolist())
-                    output_files[dir].append(video_output_path)  # Aggiungi 'video_output_path' alla lista associata alla chiave 'dir'
+                    output_files[dir].append(video_output_path)
 
-    if not output_files:  # Controlla se il dizionario è vuoto
+    if not output_files:
         return None
     return output_files
-
 
 def take_gt_paths(data_path): 
     gt_folders = {}
@@ -63,36 +60,13 @@ def take_gt_paths(data_path):
             gt_folders[dir] = dir_path
     return gt_folders
 
-
-'''
-def take_output_files(data_path, output_path, i):
-    output_files = {}  # Crea un dizionario vuoto
-    for dir in os.listdir(data_path):
-        for video_dir in os.listdir(os.path.join(data_path, dir)):
-            if video_dir == 'img1':
-                video_output_path = os.path.join(output_path, dir, f'output_{i}_sim.txt')
-                if dir not in output_files:
-                    output_files[dir] = []  # Crea una lista vuota per la chiave 'dir'
-                if os.path.exists(video_output_path):  # Verifica se il file esiste
-                    output_files[dir].append(video_output_path)  # Aggiungi 'video_output_path' alla lista associata alla chiave 'dir'
-
-    return output_files'''
-
-def take_output_files(data_path, output_path, similarity_thresholds):
-    output_files = {}  # Crea un dizionario vuoto
-    for i, similarity_threshold in enumerate(similarity_thresholds):
+def take_output_files(output_path, similarity_thresholds):
+    output_folders = []
+    for similarity_threshold in similarity_thresholds:
         threshold_dir = f'sim_0{int(similarity_threshold * 10):01d}'
-        for dir in os.listdir(data_path):
-            video_output_path = os.path.join(output_path, threshold_dir, dir, f'output_{i}_sim.txt')
-            if dir not in output_files:
-                output_files[dir] = []  # Crea una lista vuota per la chiave 'dir'
-            if os.path.exists(video_output_path):  # Verifica se il file esiste
-                output_files[dir].append(video_output_path)  # Aggiungi 'video_output_path' alla lista associata alla chiave 'dir'
-    return output_files
-
-
-
-
+        threshold_folder = os.path.join(output_path, threshold_dir)
+        output_folders.append(threshold_folder)
+    return output_folders
 
 def save_boxes(tracks, frame, save_path, confs):
     with open(save_path, 'a') as file:
@@ -106,9 +80,8 @@ def save_boxes(tracks, frame, save_path, confs):
             line = f"{frame}, {track.track_id}, {bb_left}, {bb_top}, {bb_width}, {bb_height}, {max_conf}, -1, -1, -1\n"
             file.write(line)
 
-def run_trackeval(gt_folder, results_folder, eval_path):
-    """Run TrackEval on the generated output files."""
-    # Configuration options for TrackEval
+
+def run_trackeval(gt_folder, trackers_folder, eval_path):
     eval_config = {
         'USE_PARALLEL': False,
         'NUM_PARALLEL_CORES': 1,
@@ -123,15 +96,20 @@ def run_trackeval(gt_folder, results_folder, eval_path):
     }
 
     dataset_config = {
-        'GT_FOLDER': gt_folder,  # Location of GT data
-        'TRACKERS_FOLDER': os.path.dirname(results_folder),  # Trackers location
-        'OUTPUT_FOLDER': os.path.dirname(eval_path),  # Where to save eval results
-        'TRACKERS_TO_EVAL': ['default_tracker'],  # List of trackers to evaluate
-        'CLASSES_TO_EVAL': ['pedestrian'],  # List of classes to evaluate
-        'BENCHMARK': 'MOT17',  # Benchmark to evaluate
-        'SEQMAP_FILE': '../bbox/seqmaps/MOT17-train.txt',  # Path to seqmap file
+        'GT_FOLDER': gt_folder,
+        'TRACKERS_FOLDER': os.path.abspath(trackers_folder),
+        'OUTPUT_FOLDER': os.path.abspath(eval_path),
+        'TRACKERS_TO_EVAL': ['default_tracker'],
+        'CLASSES_TO_EVAL': ['pedestrian'],
+        'BENCHMARK': 'MOT17',
+        'SEQMAP_FILE': os.path.abspath('../MOT17/seqmaps/MOT17-train.txt'),
         'GT_LOC_FORMAT': '{gt_folder}/{seq}/gt/gt.txt'
     }
+
+    print(f"GT_FOLDER: {dataset_config['GT_FOLDER']}")
+    print(f"TRACKERS_FOLDER: {dataset_config['TRACKERS_FOLDER']}")
+    print(f"SEQMAP_FILE: {dataset_config['SEQMAP_FILE']}")
+    print(f"GT_LOC_FORMAT: {dataset_config['GT_LOC_FORMAT']}")
 
     evaluator = Evaluator(eval_config)
     dataset_list = [datasets.MotChallenge2DBox(dataset_config)]
@@ -139,43 +117,116 @@ def run_trackeval(gt_folder, results_folder, eval_path):
     evaluator.evaluate(dataset_list, metrics_list)
 
 
-def main(data_path, output_path, similarity_thresholds):
+
+def gen_files(data_path, output_path, similarity_thresholds):
     model = torch.hub.load('facebookresearch/detr:main', 'detr_resnet50', pretrained=True)
 
     for i, similarity_threshold in enumerate(similarity_thresholds):
-        output_files = generate_output_files(data_path, output_path, similarity_threshold, model, i)
+        generate_output_files(data_path, output_path, similarity_threshold, model, i)
     
-    return output_files
 
-def do_valutation(data_path, output_path, similarity_thresholds, output_files=None):
-    # Carico in una lista i percorsi delle cartelle gt
-    gt_folders = take_gt_paths(data_path)
+def do_valutation(gt_folder, output_path, similarity_thresholds):    
+    output_folders = take_output_files(output_path, similarity_thresholds)
     
-    if output_files is None:
-        output_files = {}
-        output_files.update(take_output_files(data_path, output_path, similarity_thresholds))
-    
-    for i, threshold in enumerate(similarity_thresholds):
-        for key, value in output_files.items():
-            gt_path = gt_folders[key]
-            detection_files = [v for v in value if f'output_{i}_sim.txt' in v]
-            for detection_file in detection_files:
-                print(f'Valutazione per {key} con soglia {threshold}: {detection_file}')
-                
-                # Esegue TrackEval
-                run_trackeval(gt_path, detection_file, f'results/eval_{key}_sim_{int(threshold * 10):01d}.txt')
+    for i, trackers_folder in enumerate(output_folders):
+        threshold = similarity_thresholds[i]
+        print(f'Valutazione {i} con soglia {threshold}: {trackers_folder}')
+        eval_path = f'results/eval_sim_{int(threshold * 10):01d}.txt'
+        
+        run_trackeval(gt_folder, trackers_folder, eval_path)
 
+def select_best_tracker():
+
+    file_names = [
+        'results/eval_sim_3.txt/default_tracker/pedestrian_summary.txt',
+        'results/eval_sim_4.txt/default_tracker/pedestrian_summary.txt',
+        'results/eval_sim_5.txt/default_tracker/pedestrian_summary.txt',
+        'results/eval_sim_7.txt/default_tracker/pedestrian_summary.txt',
+        'results/eval_sim_9.txt/default_tracker/pedestrian_summary.txt'
+    ]
+
+    names = [
+        'sim_03',
+        'sim_04',
+        'sim_05',
+        'sim_07',
+        'sim_09'
+    ]
+
+    # Lista per memorizzare i DataFrame
+    dfs = []
+
+    # Carica i dati dai file
+    for file in file_names:
+        df = pd.read_csv(file, sep='\s+')
+        dfs.append(df)
+
+    # Funzione per calcolare le metriche medie di interesse
+    def calculate_metrics(df):
+        required_columns = ['HOTA', 'CLR_Re', 'CLR_Pr', 'MOTA', 'MOTP']
+        for col in required_columns:
+            if col not in df.columns:
+                raise ValueError(f"La colonna '{col}' non è presente nei dati.")
+        
+        hota = df['HOTA'].mean()
+        clear_re = df['CLR_Re'].mean()
+        clear_pr = df['CLR_Pr'].mean()
+        mota = df['MOTA'].mean()
+        motp = df['MOTP'].mean()
+        return {'HOTA': hota, 'CLR_Re': clear_re, 'CLR_Pr': clear_pr, 'MOTA': mota, 'MOTP': motp}
+
+    # Calcola le metriche per ciascun tracker
+    metrics = []
+    for df in dfs:
+        metrics.append(calculate_metrics(df))
+
+    # Crea un DataFrame per confrontare le metriche
+    comparison_df = pd.DataFrame(metrics, index=names)
+
+    # Mostra il DataFrame
+    print("Confronto delle metriche:")
+    print(comparison_df)
+
+    # Normalizzazione delle metriche
+    normalized_df = (comparison_df - comparison_df.min()) / (comparison_df.max() - comparison_df.min())
+    
+    # Calcolo del punteggio complessivo
+    normalized_df['total_score'] = normalized_df.sum(axis=1)
+
+    # Mostra il DataFrame normalizzato
+    print("Confronto delle metriche normalizzate:")
+    print(normalized_df)
+
+    # Seleziona il tracker con il punteggio complessivo più alto
+    best_tracker = normalized_df['total_score'].idxmax()
+    print("Il miglior tracker considerando tutte le metriche è:", best_tracker)
+
+    # Salva i risultati in un file
+    with open('best_tracker.txt', 'w') as f:
+        f.write("Confronto delle metriche:\n")
+        f.write(comparison_df.to_string())
+        f.write("\n\nConfronto delle metriche normalizzate:\n")
+        f.write(normalized_df.to_string())
+        f.write("\n\nIl miglior tracker considerando tutte le metriche e':\n")
+        f.write(str(best_tracker))
+
+
+def normalize_path(path):
+    return os.path.normpath(os.path.abspath(path))
 
 if __name__ == "__main__":
-    data_path = '../MOT17/train'
+    data_path = '../MOT17'
     output_path = '../bbox/train_bbox'
-    similarity_thresholds = [0.3, 0.5, 0.7, 0.9, 0.4]
+    similarity_thresholds = [0.3, 0.4, 0.5, 0.7, 0.9]
 
     flag_gen_files = False
 
     if flag_gen_files:
-        output_files = main(data_path, output_path, similarity_thresholds)
-    else:
-        output_files = None
+        gen_files(data_path, output_path, similarity_thresholds)
 
-    do_valutation(data_path, output_path, similarity_thresholds, output_files)
+
+    gt_folder = normalize_path(data_path)
+    output_path = normalize_path(output_path)
+    do_valutation(gt_folder, output_path, similarity_thresholds)
+
+    select_best_tracker()
