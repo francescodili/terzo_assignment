@@ -230,7 +230,7 @@ def select_best_tracker():
 
 def normalize_path(path):
     """
-    Funzione per normalizzare i percorsi assoluti prima di passarli all'evaluator
+    Normalizza i percorsi assoluti prima di passarli all'evaluator
     """
     return os.path.normpath(os.path.abspath(path))
 
