@@ -87,10 +87,16 @@ def valutation_test_videos(gt_folder, trackers_folder):
 
 
 def save_results(file, output_file):
+    # Leggi il file di input
     df = pd.read_csv(file, sep='\s+')
 
-    # Seleziona le colonne di interesse
-    metrics_of_interest = ['HOTA', 'MOTA', 'MOTP', 'CLR_Re', 'CLR_Pr', 'sMOTA']
+    # Elenco delle metriche di interesse (HOTA e CLEAR)
+    metrics_of_interest = [
+        'HOTA', 'CLR_Re', 'CLR_Pr', 'MOTA', 'MOTP', 'MT', 'ML',
+        'CLR_FP', 'CLR_FN', 'IDSW'
+    ]
+
+    # Seleziona le colonne di interesse se esistono nel dataframe
     df_metrics = df[metrics_of_interest]
 
     # Imposta il nome della riga
@@ -217,8 +223,8 @@ def create_videos_from_frames(output_dir, fps=30):
 if __name__ == "__main__":
     data_path = '../MOT17'
     output_path = '../bbox/test_bbox'
-    #model = torch.hub.load('facebookresearch/detr:main', 'detr_resnet50', pretrained=True)
-    similarity_threshold = 0.5
+    model = torch.hub.load('facebookresearch/detr:main', 'detr_resnet50', pretrained=True)
+    similarity_threshold = 0.7
 
     #generate_output_test_files(data_path, output_path, similarity_threshold, model)
 
@@ -230,13 +236,13 @@ if __name__ == "__main__":
     file_best_worst = 'results/eval_sim_test.txt/default_tracker/pedestrian_detailed.csv'
     output_file = 'test_metrics_summary.txt'
 
-    #save_results(file_results, output_file)
+    save_results(file_results, output_file)
 
-    #select_best_worst_video(file_best_worst, output_file) 
+    select_best_worst_video(file_best_worst, output_file) 
 
     original_videos = os.path.join(data_path, 'MOT17-test')
     #generate_frames(os.path.join(output_path, 'MOT17-test', 'default_tracker', 'data'), original_videos)
 
 
     output_dir = '../videos'
-    create_videos_from_frames(output_dir)
+    #create_videos_from_frames(output_dir)

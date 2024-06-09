@@ -148,17 +148,19 @@ def select_best_tracker():
 
     # Funzione per calcolare le metriche medie di interesse
     def calculate_metrics(df):
-        required_columns = ['HOTA', 'CLR_Re', 'CLR_Pr', 'MOTA', 'MOTP']
+        required_columns = [
+            'HOTA', 'CLR_Re', 'CLR_Pr', 'MOTA', 'MOTP', 'MT', 'ML',
+            'CLR_FP', 'CLR_FN', 'IDSW'
+        ]
         for col in required_columns:
             if col not in df.columns:
                 print(f"La colonna '{col}' non è presente nei dati.")
         
-        hota = df['HOTA']
-        clear_re = df['CLR_Re']
-        clear_pr = df['CLR_Pr']
-        mota = df['MOTA']
-        motp = df['MOTP']
-        return {'HOTA': hota, 'CLR_Re': clear_re, 'CLR_Pr': clear_pr, 'MOTA': mota, 'MOTP': motp}
+        metrics = {}
+        for col in required_columns:
+            metrics[col] = df[col].mean()
+        
+        return metrics
 
     # Calcola le metriche per ciascun tracker
     metrics = []
@@ -173,8 +175,17 @@ def select_best_tracker():
     print(comparison_df)
 
     # Normalizzazione delle metriche
-    normalized_df = (comparison_df - comparison_df.min()) / (comparison_df.max() - comparison_df.min())
-    
+    metrics_higher_better = ['HOTA', 'CLR_Re', 'CLR_Pr', 'MOTA', 'MOTP', 'MT']
+    metrics_lower_better = ['ML', 'CLR_FP', 'CLR_FN', 'IDSW']
+
+    normalized_df = pd.DataFrame(index=comparison_df.index)
+
+    for col in metrics_higher_better:
+        normalized_df[col] = (comparison_df[col] - comparison_df[col].min()) / (comparison_df[col].max() - comparison_df[col].min())
+
+    for col in metrics_lower_better:
+        normalized_df[col] = (comparison_df[col].max() - comparison_df[col]) / (comparison_df[col].max() - comparison_df[col].min())
+
     # Calcolo del punteggio complessivo
     normalized_df['total_score'] = normalized_df.sum(axis=1)
 
@@ -195,7 +206,6 @@ def select_best_tracker():
         f.write("\n\nIl miglior tracker considerando tutte le metriche e':\n")
         f.write(str(best_tracker))
 
-
 def normalize_path(path):
     return os.path.normpath(os.path.abspath(path))
 
@@ -212,6 +222,6 @@ if __name__ == "__main__":
 
     gt_folder = normalize_path(data_path)
     output_path = normalize_path(output_path)
-    do_valutation(gt_folder, output_path, similarity_thresholds)
+    #do_valutation(gt_folder, output_path, similarity_thresholds)
 
     select_best_tracker()

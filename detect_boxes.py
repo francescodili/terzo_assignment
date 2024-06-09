@@ -3,6 +3,8 @@ import torchvision.transforms as T
 import cv2
 import numpy as np
 import random
+from scipy.optimize import linear_sum_assignment
+import compare_crops
 
 CLASSES = [
     'N/A', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus',
@@ -81,3 +83,41 @@ def draw_boxes(img, boxes, ids, colors):
 def generate_unique_colors(n):
     random.seed(42)
     return [(random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)) for _ in range(n)]
+
+
+def match_detections_to_tracks(detections, crops, tracks, resnet, similarity_threshold):
+    if len(tracks) == 0:
+        return np.empty((0, 2), dtype=int), np.arange(len(detections)), np.empty((0, 4), dtype=int)
+
+    detection_features = compare_crops.extract_features(crops, resnet)
+    track_crops = [track.crop for track in tracks]
+    track_features = compare_crops.extract_features(track_crops, resnet)
+
+    cost_matrix = np.zeros((len(tracks), len(detections)), dtype=np.float32)
+    ssim_scores = np.zeros((len(tracks), len(detections)), dtype=np.float32)
+
+    for t, trk in enumerate(tracks):
+        for d, det in enumerate(detections):
+            ssim_scores[t, d] = compare_crops.similarity_between_crops(trk.crop, crops[d])
+            similarity = compare_crops.compute_similarity(trk.bbox, det, ssim_scores[t, d], track_features[t], detection_features[d], trk.crop, crops[d])
+            cost_matrix[t, d] = 1 - similarity  # Convert similarity to cost
+
+    if cost_matrix.max() > cost_matrix.min():  # Evita la divisione per zero
+        cost_matrix = (cost_matrix - cost_matrix.min()) / (cost_matrix.max() - cost_matrix.min())
+
+
+    matched_indices = linear_sum_assignment(cost_matrix)
+    matched_indices = list(zip(matched_indices[0], matched_indices[1]))
+
+    unmatched_detections = list(set(range(len(detections))) - set(i for _, i in matched_indices))
+    unmatched_tracks = list(set(range(len(tracks))) - set(t for t, _ in matched_indices))
+
+    matches = []
+    for t, d in matched_indices:
+        if cost_matrix[t, d] <= 1 - similarity_threshold:
+            matches.append((t, d))
+        else:
+            unmatched_detections.append(d)
+            unmatched_tracks.append(t)
+
+    return matches, np.array(unmatched_detections), np.array(unmatched_tracks)
