@@ -11,6 +11,11 @@ import detect_boxes
 import cv2
 
 def generate_output_test_files(data_path, output_path, similarity_threshold, model, test_dir = 'MOT17-test'):
+    """
+    Genera un percorso (con la struttura necessaria per TrackEval), per salvare i file con le detections. 
+    Al variare del video, istanzia un nuovo tracker per evitare duplicazione di ID.
+    Viene eseguita solo sui dati di test.
+    """
     output_files = {}
     video_path = os.path.join(data_path, test_dir)
     for dir in os.listdir(video_path):
@@ -45,6 +50,9 @@ def generate_output_test_files(data_path, output_path, similarity_threshold, mod
     return output_files
 
 def run_trackeval_test(gt_folder, trackers_folder, eval_path):
+    """
+    Configurazione dell'evaluator, dei percorsi per il dataset e delle metriche per i dati di test per far partire l'evaluator di TrackEval sul tracking prodotto.
+    """
     eval_config = {
         'USE_PARALLEL': False,
         'NUM_PARALLEL_CORES': 1,
@@ -79,7 +87,9 @@ def run_trackeval_test(gt_folder, trackers_folder, eval_path):
 
 
 def valutation_test_videos(gt_folder, trackers_folder):    
-    
+    """"
+    Avvia la valutazione dei video di test
+    """
     print(f'Valutazione con soglia 0.5: {trackers_folder}')
     eval_path = f'results/eval_sim_test.txt'
     
@@ -87,35 +97,34 @@ def valutation_test_videos(gt_folder, trackers_folder):
 
 
 def save_results(file, output_file):
-    # Leggi il file di input
+    """
+    Salva i risultati ottenuti, specificando le metriche di interesse
+    """
     df = pd.read_csv(file, sep='\s+')
 
-    # Elenco delle metriche di interesse (HOTA e CLEAR)
     metrics_of_interest = [
         'HOTA', 'CLR_Re', 'CLR_Pr', 'MOTA', 'MOTP', 'MT', 'ML',
         'CLR_FP', 'CLR_FN', 'IDSW'
     ]
 
-    # Seleziona le colonne di interesse se esistono nel dataframe
     df_metrics = df[metrics_of_interest]
 
     # Imposta il nome della riga
     df_metrics.index = ['test_results']
 
-    # Salva i risultati in un nuovo file
     df_metrics.to_csv(output_file, sep='\t')
 
     print(f'I risultati sono stati salvati in {output_file}')
 
 
 def select_best_worst_video(file_path, output_file):
-    # Carica il file CSV
+    """
+    Seleziona il migliore e il peggior video tra quelli di test sulla base di alcune metriche selezionate
+    """
     df = pd.read_csv(file_path)
     
-    # Elenco delle metriche di interesse
     metrics = ['HOTA(0)', 'LocA(0)', 'HOTALocA(0)', 'MOTA', 'MOTP', 'CLR_Re', 'CLR_Pr', 'sMOTA']
     
-    # Seleziona solo le colonne di interesse
     selected_columns = ['seq'] + metrics
     df_selected = df[selected_columns]
     
@@ -124,7 +133,6 @@ def select_best_worst_video(file_path, output_file):
     for metric in metrics:
         df_normalized[metric] = (df_selected[metric] - df_selected[metric].min()) / (df_selected[metric].max() - df_selected[metric].min())
     
-    # Calcola il punteggio complessivo
     df_normalized['total_score'] = df_normalized[metrics].sum(axis=1)
     
     # Ordina i video in base al punteggio complessivo
@@ -134,13 +142,11 @@ def select_best_worst_video(file_path, output_file):
     best_video = df_sorted.iloc[0]
     worst_video = df_sorted.iloc[-1]
     
-    # Mostra i risultati
     print("Il miglior video è:")
     print(best_video[['seq', 'total_score']])
     print("\nIl peggior video è:")
     print(worst_video[['seq', 'total_score']])
     
-    # Salva i risultati in un file
     with open(output_file, 'a') as f:
         f.write("\n\nIl miglior video e':\n")
         f.write(best_video[['seq', 'total_score']].to_string(header=False, index=False))
@@ -150,16 +156,17 @@ def select_best_worst_video(file_path, output_file):
     print(f'I risultati sono stati salvati in {output_file}')
 
 def generate_frames(videos_path, original_videos):
+    """
+    Legge i file con le detections e genera i frame con le bounding box disegnate, salvandole in memoria.
+    """
     for video in os.listdir(videos_path):
         video_path = os.path.join(videos_path, video)
         with open(video_path, 'r') as f:
             lines = f.readlines()
 
-        # Creare una mappa di colori unica per ogni ID
         ids = list(set([int(line.split(',')[1]) for line in lines]))
         id_color_map = {id_: color for id_, color in zip(ids, detect_boxes.generate_unique_colors(len(ids)))}
 
-        # Directory per salvare i frame del video
         output_dir = f'../videos/{video.split(".")[0]}'
         os.makedirs(output_dir, exist_ok=True)
 
@@ -190,11 +197,14 @@ def generate_frames(videos_path, original_videos):
             cv2.imwrite(output_img_path, cv2.cvtColor(img_with_boxes, cv2.COLOR_RGB2BGR))
 
 def create_videos_from_frames(output_dir, fps=30):
+    """
+    Compone i frame generati per creare un video unico in formato mp4
+    """
     for folder_name in os.listdir(output_dir):
         folder_path = os.path.join(output_dir, folder_name)
         if os.path.isdir(folder_path):
             frame_files = [f for f in os.listdir(folder_path) if f.endswith('.jpg')]
-            frame_files.sort()  # Assicurati che i frame siano ordinati
+            frame_files.sort()  # Assicura che i frame siano ordinati
 
             # Verifica che ci siano frame nella cartella
             if len(frame_files) == 0:
@@ -205,10 +215,9 @@ def create_videos_from_frames(output_dir, fps=30):
             first_frame = cv2.imread(first_frame_path)
             height, width, layers = first_frame.shape
 
-            # Definisci il percorso di output per il video
             video_output_path = os.path.join(output_dir, f'{folder_name}.mp4')
 
-            # Inizializza il video writer
+            # Inizializza il video writer con il codec adeguato per MP4
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
             video_writer = cv2.VideoWriter(video_output_path, fourcc, fps, (width, height))
 
@@ -226,11 +235,11 @@ if __name__ == "__main__":
     model = torch.hub.load('facebookresearch/detr:main', 'detr_resnet50', pretrained=True)
     similarity_threshold = 0.7
 
-    #generate_output_test_files(data_path, output_path, similarity_threshold, model)
+    generate_output_test_files(data_path, output_path, similarity_threshold, model)
 
     gt_folder = validazione.normalize_path(data_path)
     output_path = validazione.normalize_path(output_path)
-    #valutation_test_videos(gt_folder, output_path)
+    valutation_test_videos(gt_folder, output_path)
 
     file_results = 'results/eval_sim_test.txt/default_tracker/pedestrian_summary.txt'
     file_best_worst = 'results/eval_sim_test.txt/default_tracker/pedestrian_detailed.csv'
@@ -241,8 +250,8 @@ if __name__ == "__main__":
     select_best_worst_video(file_best_worst, output_file) 
 
     original_videos = os.path.join(data_path, 'MOT17-test')
-    #generate_frames(os.path.join(output_path, 'MOT17-test', 'default_tracker', 'data'), original_videos)
+    generate_frames(os.path.join(output_path, 'MOT17-test', 'default_tracker', 'data'), original_videos)
 
 
     output_dir = '../videos'
-    #create_videos_from_frames(output_dir)
+    create_videos_from_frames(output_dir)

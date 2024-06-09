@@ -9,6 +9,10 @@ from TrackEval.trackeval import Evaluator, datasets, metrics
 
 
 def generate_output_files(data_path, output_path, similarity_threshold, model, train_dir = 'MOT17-train'):
+    """
+    Sulla base della similarity_threshold, genera un percorso (con la struttura necessaria per TrackEval), per salvare i file con le detections. 
+    Al variare del video, istanzia un nuovo tracker per evitare duplicazione di ID
+    """
     output_files = {}
     threshold_dir = f'sim_0{int(similarity_threshold * 10):01d}'
     video_path = os.path.join(data_path, train_dir)
@@ -45,6 +49,9 @@ def generate_output_files(data_path, output_path, similarity_threshold, model, t
 
 
 def take_output_files(output_path, similarity_thresholds):
+    """
+    Preleva i percorsi dei file di output generati. La cartella conterrà l'elemento MOT17-train, come indicato da TrackEval. (In realtà i video sono per la validazione)
+    """
     output_folders = []
     for similarity_threshold in similarity_thresholds:
         threshold_dir = f'sim_0{int(similarity_threshold * 10):01d}'
@@ -53,6 +60,9 @@ def take_output_files(output_path, similarity_thresholds):
     return output_folders
 
 def save_boxes(tracks, frame, save_path, confs):
+    """
+    Salva le bounding box, con la loro confidence associata, seguendo la struttura necessaria per TrackEval.
+    """
     with open(save_path, 'a') as file:
         for track, conf in zip(tracks, confs):
             bbox = track.bbox
@@ -66,6 +76,9 @@ def save_boxes(tracks, frame, save_path, confs):
 
 
 def run_trackeval(gt_folder, trackers_folder, eval_path):
+    """
+    Configurazione dell'evaluator, dei percorsi per il dataset e delle metriche per far partire l'evaluator di TrackEval sul tracking prodotto.
+    """
     eval_config = {
         'USE_PARALLEL': False,
         'NUM_PARALLEL_CORES': 1,
@@ -104,6 +117,9 @@ def run_trackeval(gt_folder, trackers_folder, eval_path):
 
 
 def gen_files(data_path, output_path, similarity_thresholds):
+    """
+    Istanzia il modello preaddestrato e richiama la funzione per generare i file di output con i diversi valori di similarity_threshold
+    """
     model = torch.hub.load('facebookresearch/detr:main', 'detr_resnet50', pretrained=True)
 
     for similarity_threshold in similarity_thresholds:
@@ -111,6 +127,9 @@ def gen_files(data_path, output_path, similarity_thresholds):
     
 
 def do_valutation(gt_folder, output_path, similarity_thresholds):    
+    """
+    Avvia la valutazione per ogni tracker al variare di similarity_threshold
+    """
     output_folders = take_output_files(output_path, similarity_thresholds)
     
     for i, trackers_folder in enumerate(output_folders):
@@ -121,6 +140,12 @@ def do_valutation(gt_folder, output_path, similarity_thresholds):
         run_trackeval(gt_folder, trackers_folder, eval_path)
 
 def select_best_tracker():
+    """
+    Seleziona il tracker migliore sulla base di queste metriche.
+    'HOTA', 'CLR_Re', 'CLR_Pr', 'MOTA', 'MOTP', 'MT', 'ML', 'CLR_FP', 'CLR_FN', 'IDSW'
+
+    La normalizzazione viene fatta tenendo conto di quali valori devono essere maggiori e quali minori.
+    """
 
     file_names = [
         'results/eval_sim_3.txt/default_tracker/pedestrian_summary.txt',
@@ -138,16 +163,16 @@ def select_best_tracker():
         'sim_09'
     ]
 
-    # Lista per memorizzare i DataFrame
     dfs = []
 
-    # Carica i dati dai file
     for file in file_names:
         df = pd.read_csv(file, sep='\s+')
         dfs.append(df)
 
-    # Funzione per calcolare le metriche medie di interesse
     def calculate_metrics(df):
+        """
+        Funzione per calcolare le metriche medie di interesse
+        """
         required_columns = [
             'HOTA', 'CLR_Re', 'CLR_Pr', 'MOTA', 'MOTP', 'MT', 'ML',
             'CLR_FP', 'CLR_FN', 'IDSW'
@@ -170,7 +195,6 @@ def select_best_tracker():
     # Crea un DataFrame per confrontare le metriche
     comparison_df = pd.DataFrame(metrics, index=names)
 
-    # Mostra il DataFrame
     print("Confronto delle metriche:")
     print(comparison_df)
 
@@ -189,7 +213,6 @@ def select_best_tracker():
     # Calcolo del punteggio complessivo
     normalized_df['total_score'] = normalized_df.sum(axis=1)
 
-    # Mostra il DataFrame normalizzato
     print("Confronto delle metriche normalizzate:")
     print(normalized_df)
 
@@ -197,7 +220,6 @@ def select_best_tracker():
     best_tracker = normalized_df['total_score'].idxmax()
     print("Il miglior tracker considerando tutte le metriche è:", best_tracker)
 
-    # Salva i risultati in un file
     with open('best_tracker.txt', 'w') as f:
         f.write("Confronto delle metriche:\n")
         f.write(comparison_df.to_string())
@@ -207,6 +229,9 @@ def select_best_tracker():
         f.write(str(best_tracker))
 
 def normalize_path(path):
+    """
+    Funzione per normalizzare i percorsi assoluti prima di passarli all'evaluator
+    """
     return os.path.normpath(os.path.abspath(path))
 
 if __name__ == "__main__":
@@ -222,6 +247,6 @@ if __name__ == "__main__":
 
     gt_folder = normalize_path(data_path)
     output_path = normalize_path(output_path)
-    #do_valutation(gt_folder, output_path, similarity_thresholds)
+    do_valutation(gt_folder, output_path, similarity_thresholds)
 
     select_best_tracker()

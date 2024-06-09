@@ -8,6 +8,9 @@ import numpy as np
 
 
 def extract_crops(pil_img, boxes):
+    """
+    Estrae i crop data un immagine e la lista delle box (xmin, ymin, xmax, ymax)
+    """
     img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
     crops = []
     for (xmin, ymin, xmax, ymax) in boxes.tolist():
@@ -19,11 +22,15 @@ def extract_crops(pil_img, boxes):
 
 
 def normalize_similarity(value, min_val, max_val):
-    """Normalizza il valore tra min_val e max_val a un range di 0 a 1."""
+    """
+    Normalizza il valore tra min_val e max_val a un range di 0 a 1.
+    """
     return (value - min_val) / (max_val - min_val)
 
 def compute_histogram_similarity(crop1, crop2):
-    """Calcola la similarità tra gli istogrammi di colore normalizzati tra 0 e 1."""
+    """
+    Calcola la similarità tra gli istogrammi di colore normalizzati tra 0 e 1.
+    """
     hist1 = cv2.calcHist([crop1], [0, 1, 2], None, [8, 8, 8], [0, 256, 0, 256, 0, 256])
     hist2 = cv2.calcHist([crop2], [0, 1, 2], None, [8, 8, 8], [0, 256, 0, 256, 0, 256])
     hist_similarity = cv2.compareHist(hist1, hist2, cv2.HISTCMP_CORREL)
@@ -31,6 +38,16 @@ def compute_histogram_similarity(crop1, crop2):
 
 
 def compute_similarity(box1, box2, ssim_score, features1, features2, crop1, crop2):
+    """
+    Calcola la similarità combinata tra:
+    - Intersection over Union;
+    - features estratte dai crop con resnet50;
+    - distanza tra i centri delle box, convertita in similarità;
+    - similarità strutturale tra crop (SSIM);
+    - similarità tra gli istogrammi di colore
+
+    Tutti i valori sono normalizzati tra 0 e 1, così la similarità restituita sarà 1 per immagini identiche e 0 per immagini diverse.
+    """
     iou = compute_iou(box1, box2)
 
     # Calcolo della similarità delle feature con normalizzazione
@@ -61,6 +78,9 @@ def compute_similarity(box1, box2, ssim_score, features1, features2, crop1, crop
 
 
 def extract_features(crops, model):
+    """
+    Prepara i crop per passarli al modello resnet50 ed estrae le features dai due crop.
+    """
     resized_crops = [cv2.resize(crop, (224, 224)) for crop in crops]  # Ridimensiona tutte le immagini a 224x224
     rgb_crops = [cv2.cvtColor(crop, cv2.COLOR_BGR2RGB) for crop in resized_crops]  # Converti tutte le immagini in RGB
     img_arrays = np.array([keras.utils.img_to_array(crop) for crop in rgb_crops])
@@ -70,6 +90,9 @@ def extract_features(crops, model):
     return features
 
 def compute_iou(box1, box2):
+    """
+    Calcola l'Intersection over Union tra due bounding box.
+    """
     x1, y1, x2, y2 = box1
     x1g, y1g, x2g, y2g = box2
 
@@ -86,6 +109,9 @@ def compute_iou(box1, box2):
     return inter_area / union_area
 
 def similarity_between_crops(crop1, crop2):
+    """
+    Calcola la similarità strutturale tra due crop.
+    """
     crop1_gray = cv2.cvtColor(crop1, cv2.COLOR_BGR2GRAY)
     crop2_gray = cv2.cvtColor(crop2, cv2.COLOR_BGR2GRAY)
 

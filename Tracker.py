@@ -18,9 +18,10 @@ class Tracker:
         """
         Aggiunge una nuova traccia con la bounding box e il crop forniti.
         
-        :param bbox: Bounding box della nuova traccia.
-        :param crop: Crop della nuova traccia.
+        bbox: Bounding box della nuova traccia.
+        crop: Crop della nuova traccia.
         """
+        #Istanzia un ID univoco e incrementale per ogni traccia
         while self.next_id in self.removed_track_ids:
             self.next_id += 1
 
@@ -33,13 +34,14 @@ class Tracker:
         """
         Aggiorna le tracce con le bounding box e i crop rilevati.
         
-        :param detected_bboxes: Bounding box rilevate.
-        :param crops: Crop rilevati.
+        detected_bboxes: Bounding box rilevate.
+        crops: Crop rilevati.
         """
         current_tracks = list(self.tracks.values())
         matches, unmatched_detections, unmatched_tracks = match_detections_to_tracks(
             detected_bboxes, crops, current_tracks, self.resnet, similarity_threshold=self.similarity_threshold)
 
+        #Per ogni match aggiorna la trccia collegata all'id richiamando la funzione update della classe Track
         for match in matches:
             track_idx, detection_idx = match
             if track_idx < len(current_tracks):
@@ -49,6 +51,7 @@ class Tracker:
             else:
                 logging.warning(f"track_idx {track_idx} out of range for current_tracks")
 
+        #Per ogni traccia che non è stata trovata viene incrementato il contatore di frame saltati. Se supera 5, la traccia viene eliminata
         for track_idx in unmatched_tracks:
             if track_idx < len(current_tracks):
                 track_id = current_tracks[track_idx].track_id
@@ -61,13 +64,12 @@ class Tracker:
             else:
                 logging.warning(f"track_idx {track_idx} out of range for current_tracks")
 
+        #Per ogni detection nuova viene istanziata una nuova traccia
         for detection_idx in unmatched_detections:
             self.add_track(detected_bboxes[detection_idx], crops[detection_idx])
 
     def get_active_tracks(self):
         """
         Restituisce le tracce attive (non perse).
-        
-        :return: Lista delle tracce attive.
         """
         return [track for track in self.tracks.values() if not track.is_lost()]
